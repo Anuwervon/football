@@ -22,11 +22,31 @@ func main() {
 	r.GET("/teams", GetTeamsHandler)
 	r.GET("/players", GetPlayersHandler)
 	r.POST("/register", UserRegisterHandler)
+	r.PUT("/teams", UpdateTeamsHandler)
 	r.Run(":8080")
 }
 
 func GetUsersHandler(c *gin.Context) {
 	c.JSON(200, apiResponse{Payload: user.Users})
+}
+
+func UpdateTeamsHandler(c *gin.Context) {
+	var t team.Team
+	err := c.BindJSON(&t)
+	if err != nil {
+		c.JSON(400, apiResponse{Payload: err.Error()})
+		return
+	}
+
+	//baroi har yak elementi da druni team.Teams mo 2ta variable i,v mesozem
+	//har yak krugda i,v harxelay baroi ki i,v znacheniyayi element da druni slice elemento
+	for i, v := range team.Teams {
+		if t.ID == v.ID {
+			team.Teams[i].Name = t.Name
+			break
+		}
+	}
+	c.JSON(200, apiResponse{Payload: team.Teams})
 }
 
 func GetTeamsHandler(c *gin.Context) {
@@ -39,6 +59,7 @@ func GetPlayersHandler(c *gin.Context) {
 
 func UserRegisterHandler(c *gin.Context) {
 	var u user.User
+	//daniyora ay body-i zapros mexonem da druni u(u-variable user.User) menavisem
 	err := c.BindJSON(&u)
 	if err != nil {
 		c.JSON(400, apiResponse{Payload: err.Error()})
