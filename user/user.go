@@ -6,10 +6,10 @@ var Users []User
 var idCnt int = 1
 
 type User struct {
-	ID       int
-	Nickname string
-	Login    string
-	Password string
+	ID       int    `json:"id"`
+	Nickname string `json:"nickname"`
+	Login    string `json:"login"`
+	Password string `json:"password"`
 }
 
 func Register(u *User) error {
@@ -42,4 +42,14 @@ func Login(u User) bool {
 	}
 
 	return false
+}
+
+func FillUserFromLoginAndPassword(u *User) {
+	for _, v := range Users {
+		if v.Login == u.Login && v.Password == u.Password {
+			u.ID = v.ID
+			u.Nickname = v.Nickname
+			return
+		}
+	}
 }

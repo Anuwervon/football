@@ -43,10 +43,13 @@ func UpdateTeamsHandler(c *gin.Context) {
 		return
 	}
 
+	p, _ := c.Get("user")
+	u := p.(user.User)
+
 	//baroi har yak elementi da druni team.Teams mo 2ta variable i,v mesozem
 	//har yak krugda i,v harxelay baroi ki i,v znacheniyayi element da druni slice elemento
 	for i, v := range team.Teams {
-		if t.ID == v.ID {
+		if t.ID == v.ID && u.ID == v.UserID {
 			team.Teams[i].Name = t.Name
 			break
 		}
@@ -163,8 +166,16 @@ func AuthMiddleware() gin.HandlerFunc {
 			return
 		}
 
+		x := token.Claims.(jwt.MapClaims)["sub"].(map[string]interface{})
+
+		var u = user.User{
+			Login:    x["login"].(string),
+			Password: x["password"].(string),
+		}
+		user.FillUserFromLoginAndPassword(&u)
+
 		// Set the user information in the context
-		c.Set("user", token)
+		c.Set("user", u)
 		c.Next()
 	}
 }
