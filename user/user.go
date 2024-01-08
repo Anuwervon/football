@@ -33,3 +33,13 @@ func IsRegistered(u User) bool {
 	}
 	return false
 }
+
+func Login(u User) bool {
+	for _, v := range Users {
+		if v.Login == u.Login && v.Password == u.Password {
+			return true
+		}
+	}
+
+	return false
+}

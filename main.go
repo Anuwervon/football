@@ -2,12 +2,16 @@ package main
 
 import (
 	"errors"
+	"fmt"
 	"football/players"
 	"football/team"
 	"football/user"
+	"net/http"
 	"strings"
+	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/golang-jwt/jwt"
 )
 
 type apiResponse struct {
@@ -18,11 +22,12 @@ type apiResponse struct {
 
 func main() {
 	r := gin.Default()
-	r.GET("/users", GetUsersHandler)
-	r.GET("/teams", GetTeamsHandler)
-	r.GET("/players", GetPlayersHandler)
+	r.GET("/users", AuthMiddleware(), GetUsersHandler)
+	r.GET("/teams", AuthMiddleware(), GetTeamsHandler)
+	r.GET("/players", AuthMiddleware(), GetPlayersHandler)
+	r.PUT("/teams", AuthMiddleware(), UpdateTeamsHandler)
 	r.POST("/register", UserRegisterHandler)
-	r.PUT("/teams", UpdateTeamsHandler)
+	r.POST("/login", UserLoginHandler)
 	r.Run(":8080")
 }
 
@@ -86,6 +91,28 @@ func UserRegisterHandler(c *gin.Context) {
 	c.JSON(200, apiResponse{Payload: "ok"})
 }
 
+func UserLoginHandler(c *gin.Context) {
+	var u user.User
+	err := c.BindJSON(&u)
+	if err != nil {
+		c.JSON(400, apiResponse{Payload: err.Error()})
+		return
+	}
+
+	if ok := user.Login(u); !ok {
+		c.JSON(http.StatusUnauthorized, apiResponse{Payload: "incorrect login or password"})
+		return
+	}
+
+	token, err := generateJWTToken(u)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, apiResponse{Payload: err.Error()})
+		return
+	}
+
+	c.JSON(200, apiResponse{Payload: token})
+}
+
 func validateRegister(u *user.User) error {
 	u.Login = strings.TrimSpace(u.Login)
 	u.Nickname = strings.TrimSpace(u.Nickname)
@@ -108,6 +135,53 @@ func validateRegister(u *user.User) error {
 	}
 
 	return nil
+}
+
+func AuthMiddleware() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		tokenString := c.GetHeader("Authorization")
+		if tokenString == "" {
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
+			c.Abort()
+			return
+		}
+
+		// Strip "Bearer " prefix
+		// tokenString = tokenString[7:]
+
+		token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
+			// Validate the signing method and return the secret key
+			if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
+				return nil, fmt.Errorf("Unexpected signing method: %v", token.Header["alg"])
+			}
+			return []byte("jwtSecret"), nil
+		})
+
+		if err != nil || !token.Valid {
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
+			c.Abort()
+			return
+		}
+
+		// Set the user information in the context
+		c.Set("user", token)
+		c.Next()
+	}
+}
+
+func generateJWTToken(u user.User) (string, error) {
+	// Define the claims for the JWT token
+	claims := jwt.MapClaims{
+		"sub": u,
+		"exp": time.Now().Add(time.Hour * 1).Unix(), // Token expires in 1 hour
+		"iat": time.Now().Unix(),
+	}
+
+	// Create the JWT token
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
+
+	// Sign the token with the secret key
+	return token.SignedString([]byte("jwtSecret"))
 }
 
 // 1. register
